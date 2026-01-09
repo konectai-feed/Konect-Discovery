@@ -1,33 +1,57 @@
 "use client";
 
 import { useState } from "react";
+import ResultCard from "./components/ResultCard";
+import type { Result } from "@/app/types/results";
 
-import ResultCard from "@/components/ResultCard";
-
-type SearchResult = Record<string, unknown>;
+/* =========================
+   Types for API response
+   ========================= */
+type SearchResult = Record<string, any>;
 
 type SearchResponse = {
   results?: SearchResult[];
 };
 
-const getResultsFromResponse = (data: SearchResponse | SearchResult[]): SearchResult[] => {
-  if (Array.isArray(data)) {
-    return data;
-  }
-
+/* =========================
+   Helpers
+   ========================= */
+const getResultsFromResponse = (
+  data: SearchResponse | SearchResult[]
+): SearchResult[] => {
+  if (Array.isArray(data)) return data;
   return data.results ?? [];
 };
 
-const getResultKey = (result: SearchResult, index: number) => {
-  const id = result.id ?? result.name;
+/* =========================
+   NORMALIZER (API → UI)
+   ========================= */
+function toResult(raw: SearchResult, index: number): Result {
+  return {
+    id: raw.id ?? `${raw.name ?? "result"}-${index}`,
+    name: raw.name ?? "Unknown",
+    category: raw.category ?? "General",
+    city: raw.city ?? "",
+    rating: Number(raw.rating ?? 0),
+    reviews: Number(raw.reviews ?? 0),
 
-  if (typeof id === "string" || typeof id === "number") {
-    return id;
-  }
+    imageUrl: raw.imageUrl,
+    website: raw.website,
+    bookingUrl: raw.bookingUrl,
+    phone: raw.phone,
 
-  return index;
-};
+    status: raw.status ?? "active",
+    finalScore: raw.finalScore,
+    score: raw.score,
+    vertical: raw.vertical,
+    _rank: raw._rank,
+    _debug: raw._debug,
+  };
+}
 
+/* =========================
+   PAGE COMPONENT
+   ========================= */
 export default function Page() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -40,89 +64,74 @@ export default function Page() {
 
     try {
       const response = await fetch(`/search?q=${encodeURIComponent(nextQuery)}`);
-
-      if (!response.ok) {
-        throw new Error("Search request failed.");
-      }
+      if (!response.ok) throw new Error("Search request failed");
 
       const data = (await response.json()) as SearchResponse | SearchResult[];
       setResults(getResultsFromResponse(data));
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to fetch results.";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Search failed");
       setResults([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (isLoading) {
-      return;
-    }
-
-    const trimmedQuery = query.trim();
-
-    if (!trimmedQuery) {
-      setResults([]);
-      setError(null);
-      return;
-    }
-
-    await fetchSearch(trimmedQuery);
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    await fetchSearch(query.trim());
   };
 
-  const shouldShowEmptyState =
-    !isLoading && !error && query.trim().length > 0 && results.length === 0;
+  /* =========================
+     NORMALIZED RESULTS (KEY)
+     ========================= */
+  const normalizedResults: Result[] = results.map(toResult);
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10">
-      <header className="flex flex-col gap-2">
+      <header>
         <h1 className="text-3xl font-semibold">Search</h1>
         <p className="text-sm text-muted-foreground">
           Find the results you need by searching below.
         </p>
       </header>
 
-      <form onSubmit={handleSubmit} className="flex w-full flex-col gap-3 sm:flex-row">
+      <form onSubmit={handleSubmit} className="flex gap-3">
         <input
           type="search"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onBlur={() => query.trim() && fetchSearch(query)}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder="Search..."
-          className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex-1 rounded-md border px-3 py-2"
         />
         <button
           type="submit"
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
           disabled={isLoading}
+          className="rounded-md bg-black px-4 py-2 text-white"
         >
           {isLoading ? "Searching..." : "Search"}
         </button>
       </form>
 
-      {error ? (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+      {error && (
+        <div className="rounded-md border border-red-400 bg-red-100 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
-      ) : null}
+      )}
 
-      {shouldShowEmptyState ? (
-        <div className="rounded-md border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-          No results found. Try a different query.
+      {normalizedResults.length === 0 && query && !isLoading && !error && (
+        <div className="rounded-md border border-dashed px-4 py-6 text-center text-sm">
+          No results found.
         </div>
-      ) : null}
+      )}
 
-      {results.length > 0 ? (
+      {normalizedResults.length > 0 && (
         <section className="grid gap-4">
-          {results.map((result, index) => (
-            <ResultCard key={getResultKey(result, index)} result={result} />
+          {normalizedResults.map((result) => (
+            <ResultCard key={result.id} result={result} />
           ))}
         </section>
-      ) : null}
+      )}
     </main>
   );
 }

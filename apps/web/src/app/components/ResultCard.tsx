@@ -1,19 +1,5 @@
 'use client';
-
-type Result = {
-  id: string;
-  name: string;
-  category: string;
-  city: string;
-  rating: number;
-  reviews: number;
-  status?: 'active' | 'preview';
-  imageUrl?: string;
-  website?: string;
-  bookingUrl?: string;
-  phone?: string;
-};
-
+import type { Result } from "@/app/types/results";
 export default function ResultresultCard({ result }: { result: Result }) {
   const {
     name,
