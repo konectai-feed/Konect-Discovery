@@ -27,20 +27,41 @@ const getResultsFromResponse = (
    NORMALIZER (API → UI)
    ========================= */
 function toResult(raw: SearchResult, index: number): Result {
+  // Parse reason_codes - could be array, JSON string, or comma-separated
+  let reasonCodes: string[] | undefined;
+  if (raw.reason_codes) {
+    if (Array.isArray(raw.reason_codes)) {
+      reasonCodes = raw.reason_codes;
+    } else if (typeof raw.reason_codes === 'string') {
+      try {
+        reasonCodes = JSON.parse(raw.reason_codes);
+      } catch {
+        reasonCodes = raw.reason_codes.split(',').map((s: string) => s.trim());
+      }
+    }
+  }
+
   return {
-    id: raw.id ?? `${raw.name ?? "result"}-${index}`,
+    id: raw.id ?? raw.business_id ?? `${raw.name ?? "result"}-${index}`,
     name: raw.name ?? "Unknown",
     category: raw.category ?? "General",
     city: raw.city ?? "",
-    rating: Number(raw.rating ?? 0),
-    reviews: Number(raw.reviews ?? 0),
+    rating: Number(raw.rating ?? raw.avg_rating ?? 0),
+    reviews: Number(raw.reviews ?? raw.review_count ?? 0),
 
-    imageUrl: raw.imageUrl,
+    imageUrl: raw.imageUrl ?? raw.image_url,
     website: raw.website,
-    bookingUrl: raw.bookingUrl,
+    bookingUrl: raw.bookingUrl ?? raw.booking_url,
     phone: raw.phone,
 
     status: raw.status ?? "active",
+
+    // Konect ranking
+    konect_rank: raw.konect_rank != null ? Number(raw.konect_rank) : undefined,
+    trust_score: raw.trust_score != null ? Number(raw.trust_score) : undefined,
+    reason_codes: reasonCodes,
+
+    // Legacy fields
     finalScore: raw.finalScore,
     score: raw.score,
     vertical: raw.vertical,

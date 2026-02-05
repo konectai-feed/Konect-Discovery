@@ -13,7 +13,12 @@ export type Result = {
   phone?: string;
   status?: "active" | "preview";
 
-  // ranking
+  // Konect ranking (from v_business_search)
+  konect_rank?: number;
+  trust_score?: number;
+  reason_codes?: string[];
+
+  // Legacy ranking fields
   finalScore?: number;
   score?: number;
   vertical?: string;
