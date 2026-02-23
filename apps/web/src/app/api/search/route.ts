@@ -16,25 +16,42 @@ export async function GET(request: Request) {
   params.set("limit", limit);
   params.set("offset", offset);
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10_000);
+
   try {
     const apiRes = await fetch(`${API_BASE}/search?${params.toString()}`, {
-      // Don't cache - always forward fresh results
       cache: "no-store",
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
+
+    // Pass the backend error body through so the client can see reason + requestId
     if (!apiRes.ok) {
-      return NextResponse.json(
-        { error: "Search service unavailable" },
-        { status: apiRes.status }
-      );
+      let errorBody: unknown;
+      try {
+        errorBody = await apiRes.json();
+      } catch {
+        errorBody = { error: "Search service unavailable" };
+      }
+      return NextResponse.json(errorBody, { status: apiRes.status });
     }
 
     const data = await apiRes.json();
     return NextResponse.json(data);
   } catch (error) {
-    console.error("Search API error:", error);
+    clearTimeout(timeoutId);
+    console.error("[search proxy] Error:", error);
+
+    const isTimeout = error instanceof Error && error.name === "AbortError";
     return NextResponse.json(
-      { error: "Search service unavailable" },
+      {
+        error: "Search service unavailable",
+        reason: isTimeout
+          ? "Backend request timed out after 10s"
+          : "Could not reach backend",
+      },
       { status: 503 }
     );
   }
